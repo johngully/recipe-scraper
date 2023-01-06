@@ -1,5 +1,6 @@
 import * as dotenv from "dotenv";
 import { readFile } from "fs/promises"
+import * as cheerio from "cheerio";
 import { Configuration, OpenAIApi } from "openai";
 import { start } from "repl";
 
@@ -7,11 +8,14 @@ import { start } from "repl";
 dotenv.config();
 const organization = process.env.OPENAI_ORG_ID;
 const apiKey = process.env.OPENAI_API_KEY;
-console.log("OpenAI API Key:", apiKey);
 
+// Mock stubs for testing purposes
 // const mockFile = "penne-with-vodka-sauce";
 // const mockFile = "chocolate-cake";
 const mockFile = "tomato-basil-soup";
+// const mockFile = "tomato-basil-soup.scraped";
+const mockUrl = "https://www.food.com/recipe/la-madeleines-tomato-basil-soup-5368";
+const mockSelector = "#recipe";
 
 const Recipe = {
   ingredients: [],
@@ -22,7 +26,7 @@ const Recipe = {
   servingSize: ""
 }
 
-const textToParse = await getRecipeTextMock();
+const textToParse = await getRecipeText(mockUrl, mockSelector);
 const recipe = await getRecipeFromText(textToParse);
 console.log("Recipe:", recipe);
 
@@ -30,9 +34,24 @@ async function getRecipeTextMock(url) {
   return await readFile(`./recipe.${mockFile}.txt`, "utf-8");
 }
 
+async function getRecipeText(url, selector) {
+  const response = await fetch(url);
+  const body = await response.text();
+  const $ = cheerio.load(body);
+  let content = $(selector).text();
+  if (!content) {
+    throw new Error(`The selector "${selector}" could not find any text.`);
+  }
+  // replace extraneous new lines from response
+  content = content.replace(/ +(?= )/g,'');
+  content = content.replace(/( \n|\n )/g,'');
+  content = content.replace(/(\r\n|\r|\n){2,}/g, '$1\n');
+  return content;
+}
+
 async function getRecipeFromText(text) {
-  const recipeText = await parseRecipeUsingOpenAIMock(text);
-  // const recipeText = await parseRecipeUsingOpenAI(text);
+  // const recipeText = await parseRecipeUsingOpenAIMock(text);
+  const recipeText = await parseRecipeUsingOpenAI(text);
   const recipe = textToRecipe(recipeText);
   return recipe;
 }
